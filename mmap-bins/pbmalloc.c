@@ -68,7 +68,7 @@ Chunk* alloc_memory(Chunk* last, size_t size) {
 }
 
 void* pbmalloc(size_t size) {
-    size_t page_index = MIN((BIN_ALIGN(size) / BIN_SIZE) - 1, 127);
+    size_t page_index = MIN((BIN_ALIGN(size) / BIN_SIZE) - 1, NUM_BINS - 1);
     Chunk* curr = NULL;
     Chunk* last = NULL;
 
