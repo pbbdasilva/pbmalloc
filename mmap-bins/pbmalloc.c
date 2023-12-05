@@ -19,7 +19,7 @@ static inline size_t PAGE_ALIGN(size_t size) {
 }
 
 Chunk* find_block(Chunk** last, size_t size) {
-    size_t page_index = (BIN_ALIGN(size) / BIN_SIZE) - 1;
+    size_t page_index = MIN((BIN_ALIGN(size) / BIN_SIZE) - 1, NUM_BINS - 1);
     Chunk* ptr = bins_ptr[page_index];
 
     // search for free chunk with enough size
