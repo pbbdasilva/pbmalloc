@@ -2,10 +2,6 @@
 
 Chunk* bins_ptr[NUM_BINS] = {0};
 
-static inline int FREE_CHUNK(Chunk* ptr) {
-    return ptr->free == 1;
-}
-
 static inline int WIDE_ENOUGH(Chunk* ptr, size_t size) {
     return ptr->size >= size;
 }
@@ -24,7 +20,7 @@ Chunk* find_block(Chunk** last, size_t size) {
 
     // search for free chunk with enough size
     while (ptr != NULL) {
-        if (FREE_CHUNK(ptr) && WIDE_ENOUGH(ptr, size)) break;
+        if (ptr->free == 1 && WIDE_ENOUGH(ptr, size)) break;
 
         *last = ptr;
         ptr = ptr->next;
@@ -49,11 +45,11 @@ Chunk* alloc_memory(Chunk* last, size_t size) {
     void* block = mmap(NULL, allocated_size, PROT_WRITE | PROT_READ,
                        MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
     assert(block != MAP_FAILED);
-
+    
     Chunk* new_block = block;
     new_block->size = allocated_size - METADATA_SIZE;
     new_block->next = NULL;
-
+    
     if (last != NULL) {
         last->next = new_block;
         new_block->prev = last;
@@ -63,7 +59,7 @@ Chunk* alloc_memory(Chunk* last, size_t size) {
     if (BIN_ALIGN(size) <= (PAGE_SIZE >> 1)) {
         split_block(new_block, ALIGN32(size));
     }
-
+    
     return new_block;
 }
 
