@@ -13,3 +13,7 @@ MMap allocates at least page size of memory. First implementation used a first-f
 Changed the implementation to use the bin-list as a free-list, making it much faster
 
 ![pbmalloc](flamegraphs/freelist128pbmalloc.svg)
+
+
+## profiling
+Profiled code using [benchmark](benchmark.c) file with **perf** and [Brendan Gregg's Flamegraph tooling](https://www.brendangregg.com/FlameGraphs/cpuflamegraphs.html#Problem)
