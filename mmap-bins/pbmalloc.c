@@ -44,7 +44,7 @@ Chunk* alloc_memory(Chunk* last, size_t size) {
     size_t allocated_size = PAGE_ALIGN(size);
     void* block = mmap(NULL, allocated_size, PROT_WRITE | PROT_READ,
                        MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-    assert(block != MAP_FAILED);
+    if (block == MAP_FAILED) return NULL;
     
     Chunk* new_block = block;
     new_block->size = allocated_size - METADATA_SIZE;
