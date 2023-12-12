@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <time.h>
 
-#define NUM_ROUNDS 100
+#define NUM_ROUNDS 100000
 #define ARRAY_SIZE 1000
 #define STRIDE 7
 
