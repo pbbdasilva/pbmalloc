@@ -1,6 +1,10 @@
+#include <stdio.h>
 #include "pbmalloc.h"
 
-Arena* arena_list;
+static Arena* arena_list;
+static pthread_mutex_t arena_list_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t data_segment_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mmap_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void append_arena_list(Arena* arena) {
     if (arena_list == NULL) {
@@ -13,12 +17,18 @@ void append_arena_list(Arena* arena) {
 }
 
 Arena* create_arena() {
+    pthread_mutex_lock(&data_segment_lock);
     void* break_ptr = sbrk(0);
     if (sbrk(ARENA_SIZE) == (void *) -1) {
+        printf("WTF SBRK not working\n");
         return NULL;
     }
+    pthread_mutex_unlock(&data_segment_lock);
     Arena* arena_ptr = (Arena*) break_ptr;
-
+    pthread_mutex_init(&arena_ptr->mutex, NULL);
+    pthread_mutex_lock(&arena_ptr->mutex);
+    arena_ptr->nxt_arena = NULL;
+    arena_ptr->prev_arena = NULL;
     return arena_ptr;
 }
 
@@ -29,14 +39,16 @@ Arena* get_arena() {
     }
     if(arena_ptr == NULL) {
         arena_ptr = create_arena();
-        pthread_mutex_lock(&arena_ptr->mutex);
-        append_arena_list(arena_ptr);
+        assert(pthread_mutex_trylock(&arena_ptr->mutex) != 0);
     }
     return arena_ptr;
 }
 
 void release_arena(Arena* arena_ptr) {
     pthread_mutex_unlock(&arena_ptr->mutex);
+    pthread_mutex_lock(&arena_list_lock);
+    append_arena_list(arena_ptr);
+    pthread_mutex_unlock(&arena_list_lock);
 }
 
 static inline size_t BIN_ALIGN(size_t size) {
@@ -81,17 +93,17 @@ void append_free_list(Chunk* chunk, size_t page_index, Arena* arena) {
 
 Chunk* alloc_memory(size_t size, Arena* arena) {
     size_t allocated_size = PAGE_ALIGN(size);
+    pthread_mutex_lock(&mmap_lock);
     void* block = mmap(NULL, allocated_size, PROT_WRITE | PROT_READ,
                        MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+    pthread_mutex_unlock(&mmap_lock);
     if (block == MAP_FAILED) {
         return NULL;
     }
-    
     Chunk* new_block = block;
     new_block->size = allocated_size - METADATA_SIZE;
     new_block->next = NULL;
     new_block->arena = arena;
-
     if (new_block->size >= (BIN_ALIGN(size) << 1)) {
         split_block(new_block, size);
         append_free_list(new_block->next, PAGE_INDEX(size), arena);
@@ -102,14 +114,12 @@ Chunk* alloc_memory(size_t size, Arena* arena) {
 
 Chunk* find_block(size_t size, Arena* arena) {
     Chunk* ptr = arena->free_list[PAGE_INDEX(size)];
-
     while (ptr != NULL) {
         if (WIDE_ENOUGH(ptr, size)) {
             break;
         }
         ptr = ptr->next;
     }
-
     return ptr;
 }
 
@@ -120,10 +130,10 @@ void* pbmalloc_thread(size_t size, Arena* arena) {
     if (arena->free_list[page_index]) {
         if (page_index != NUM_BINS - 1) {
             curr = arena->free_list[page_index];
+            assert(arena->free_list[page_index] != NULL);
             arena->free_list[page_index] = arena->free_list[page_index]->prev;
             curr->prev = NULL;
             curr->next = NULL;
-
             if (curr->size >= (BIN_ALIGN(size) << 1)) {
                 split_block(curr, size);
                 append_free_list(curr->next, page_index, arena);
