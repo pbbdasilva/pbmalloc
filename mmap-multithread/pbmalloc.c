@@ -170,5 +170,7 @@ void pbfree(void* ptr) {
     Chunk* chunk_ptr = (Chunk*) metadata_ptr;
     if (chunk_ptr->size == 0)
         return;
+    pthread_mutex_lock(&chunk_ptr->arena->mutex);
     append_free_list(chunk_ptr, PAGE_INDEX(chunk_ptr->size), chunk_ptr->arena);
+    pthread_mutex_unlock(&chunk_ptr->arena->mutex);
 }
