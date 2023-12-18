@@ -1,9 +1,10 @@
-#include "pbmalloc.h"
+#include "mmap-multithread/pbmalloc.h"
 #include <stdio.h>
 #include <time.h>
+#include <omp.h>
 
 #define NUM_ROUNDS 100000
-#define ARRAY_SIZE 1000
+#define ARRAY_SIZE 128
 #define STRIDE 7
 
 clock_t begin, end;
@@ -13,6 +14,7 @@ void test_pbmalloc() {
     size_t size[NUM_ROUNDS];
 
     begin = clock();
+#pragma omp parallel for
     for(size_t i = 0; i < NUM_ROUNDS; i++) {
         size_t v_size = (rand() % ARRAY_SIZE);
         v[i] = pbmalloc(v_size * sizeof(int));
@@ -24,6 +26,7 @@ void test_pbmalloc() {
             v[i][j] = rand();
     }
 
+//#pragma omp parallel for
     for(size_t i = 0; i < NUM_ROUNDS; i+=STRIDE)
         pbfree(v[i]);
 
@@ -44,7 +47,9 @@ void test_malloc() {
     size_t size[NUM_ROUNDS];
 
     begin = clock();
+#pragma omp parallel for
     for(size_t i = 0; i < NUM_ROUNDS; i++) {
+        printf("%d\n", omp_get_thread_num());
         size_t v_size = (rand() % ARRAY_SIZE);
         v[i] = malloc(v_size * sizeof(int));
         size[i] = v_size;
@@ -74,6 +79,7 @@ int main() {
 //    test_malloc();
 //    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 //    printf("%f\n", time_spent);
+//    printf("Hello from process: %d\n", omp_get_num_threads());
     test_pbmalloc();
 //    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
 //    printf("%f\n", time_spent);
