@@ -26,6 +26,7 @@ Arena* create_arena() {
     pthread_mutex_init(&arena_ptr->mutex, NULL);
     pthread_mutex_lock(&arena_ptr->mutex);
     arena_ptr->nxt_arena = NULL;
+    arena_ptr->is_in_list = 0;
     return arena_ptr;
 }
 
@@ -41,8 +42,12 @@ Arena* get_arena() {
 }
 
 void release_arena(Arena* arena_ptr) {
+    if (!arena_ptr->is_in_list) {
+        arena_ptr->is_in_list = 0;
+        append_arena_list(arena_ptr);
+    }
+
     pthread_mutex_unlock(&arena_ptr->mutex);
-    append_arena_list(arena_ptr);
 }
 
 static inline size_t BIN_ALIGN(size_t size) {
