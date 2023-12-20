@@ -7,13 +7,10 @@ static pthread_mutex_t data_segment_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mmap_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void append_arena_list(Arena* arena) {
-    if (arena_list == NULL) {
-        arena_list = arena;
-    } else {
-        arena->nxt_arena = arena_list;
-        arena_list->prev_arena = arena;
-        arena_list = arena;
-    }
+    pthread_mutex_lock(&arena_list_lock);
+    arena->nxt_arena = arena_list;
+    arena_list = arena;
+    pthread_mutex_unlock(&arena_list_lock);
 }
 
 Arena* create_arena() {
@@ -24,31 +21,28 @@ Arena* create_arena() {
         return NULL;
     }
     pthread_mutex_unlock(&data_segment_lock);
+
     Arena* arena_ptr = (Arena*) break_ptr;
     pthread_mutex_init(&arena_ptr->mutex, NULL);
     pthread_mutex_lock(&arena_ptr->mutex);
     arena_ptr->nxt_arena = NULL;
-    arena_ptr->prev_arena = NULL;
     return arena_ptr;
 }
 
 Arena* get_arena() {
     Arena* arena_ptr = arena_list;
-    while(arena_ptr && !pthread_mutex_trylock(&arena_ptr->mutex)) {
+    while(arena_ptr && pthread_mutex_trylock(&arena_ptr->mutex)) {
         arena_ptr = arena_ptr->nxt_arena;
     }
     if(arena_ptr == NULL) {
         arena_ptr = create_arena();
-        assert(pthread_mutex_trylock(&arena_ptr->mutex) != 0);
     }
     return arena_ptr;
 }
 
 void release_arena(Arena* arena_ptr) {
     pthread_mutex_unlock(&arena_ptr->mutex);
-    pthread_mutex_lock(&arena_list_lock);
     append_arena_list(arena_ptr);
-    pthread_mutex_unlock(&arena_list_lock);
 }
 
 static inline size_t BIN_ALIGN(size_t size) {
@@ -86,8 +80,8 @@ void append_free_list(Chunk* chunk, size_t page_index, Arena* arena) {
         arena->free_list[page_index] = arena->free_list[page_index]->next;
     } else {
         arena->free_list[page_index] = chunk;
-        chunk->next = NULL;
-        chunk->prev = NULL;
+        arena->free_list[page_index]->prev = NULL;
+        arena->free_list[page_index]->next = NULL;
     }
 }
 
@@ -131,6 +125,7 @@ void* pbmalloc_thread(size_t size, Arena* arena) {
         if (page_index != NUM_BINS - 1) {
             curr = arena->free_list[page_index];
             assert(arena->free_list[page_index] != NULL);
+            assert(arena == arena->free_list[page_index]->arena);
             arena->free_list[page_index] = arena->free_list[page_index]->prev;
             curr->prev = NULL;
             curr->next = NULL;

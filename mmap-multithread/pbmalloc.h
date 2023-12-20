@@ -32,7 +32,6 @@ struct Arena {
     Chunk* free_list[NUM_BINS];
     pthread_mutex_t mutex;
     Arena* nxt_arena;
-    Arena* prev_arena;
 };
 
 #define METADATA_SIZE sizeof(Chunk)
