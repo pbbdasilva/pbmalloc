@@ -43,7 +43,7 @@ Arena* get_arena() {
 
 void release_arena(Arena* arena_ptr) {
     if (!arena_ptr->is_in_list) {
-        arena_ptr->is_in_list = 0;
+        arena_ptr->is_in_list = 1;
         append_arena_list(arena_ptr);
     }
 
